@@ -7,13 +7,12 @@ import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 import dgl
-import math
 import numpy as np
+import time
 import torch
 import wandb
 
-from torch import nn, optim
-from torch.nn import functional as F
+from torch import optim
 from torch.utils.data import DataLoader
 from QM9 import QM9Dataset
 
@@ -26,6 +25,7 @@ def train_epoch(epoch, model, loss_fnc, dataloader, optimizer, scheduler, FLAGS)
     model.train()
 
     num_iters = len(dataloader)
+    t0 = time.time()
     for i, (g, y) in enumerate(dataloader):
         g = g.to(FLAGS.device)
         y = y.to(FLAGS.device)
@@ -40,6 +40,7 @@ def train_epoch(epoch, model, loss_fnc, dataloader, optimizer, scheduler, FLAGS)
         l1_loss.backward()
         optimizer.step()
 
+        print(f"[{epoch}|{i}] time per iter: {(time.time() - t0) / (i + 1):.5f}")
         if i % FLAGS.print_interval == 0:
             print(f"[{epoch}|{i}] l1 loss: {l1_loss:.5f} rescale loss: {rescale_loss:.5f} [units]")
         if i % FLAGS.log_interval == 0:
