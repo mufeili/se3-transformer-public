@@ -40,7 +40,7 @@ def train_epoch(epoch, model, loss_fnc, dataloader, optimizer, scheduler, FLAGS)
         l1_loss.backward()
         optimizer.step()
 
-        print(f"[{epoch}|{i}] time per iter: {(time.time() - t0) / (i + 1):.5f}")
+        print(f"[{epoch}|{i}] estimated time per iter: {(time.time() - t0) / (i + 1) * len(dataloader):.5f}")
         if i % FLAGS.print_interval == 0:
             print(f"[{epoch}|{i}] l1 loss: {l1_loss:.5f} rescale loss: {rescale_loss:.5f} [units]")
         if i % FLAGS.log_interval == 0:
