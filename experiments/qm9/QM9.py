@@ -54,7 +54,6 @@ class QM9Dataset(Dataset):
         self.num_bonds += fully_connected
 
         self.load_data(normalize)
-        self.len = len(self.targets)
         print(f"Loaded {mode}-set, task: {task}, source: {self.file_address}, length: {len(self)}")
 
     
@@ -72,6 +71,7 @@ class QM9Dataset(Dataset):
 
         # Filter out the targets and population stats
         self.targets = data[self.task]
+        self.len = len(self.targets)
 
         # TODO: use the training stats unlike the other papers
         self.mean = np.mean(self.targets)
