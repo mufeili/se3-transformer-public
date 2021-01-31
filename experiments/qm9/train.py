@@ -21,6 +21,7 @@ from experiments.qm9 import models #as models
 def to_np(x):
     return x.cpu().detach().numpy()
 
+@profile
 def train_epoch(epoch, model, loss_fnc, dataloader, optimizer, scheduler, FLAGS):
     model.train()
 

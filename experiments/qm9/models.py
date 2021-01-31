@@ -123,6 +123,7 @@ class SE3Transformer(nn.Module):
 
         return nn.ModuleList(Gblock), nn.ModuleList(FCblock)
 
+    @profile
     def forward(self, G):
         # Compute equivariant weight basis from relative positions
         basis, r = get_basis_and_r(G, self.num_degrees-1)
