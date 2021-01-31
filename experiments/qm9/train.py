@@ -27,6 +27,8 @@ def train_epoch(epoch, model, loss_fnc, dataloader, optimizer, scheduler, FLAGS)
     num_iters = len(dataloader)
     t0 = time.time()
     for i, (g, y) in enumerate(dataloader):
+        if i == 500:
+            break
         g = g.to(FLAGS.device)
         y = y.to(FLAGS.device)
 
@@ -178,8 +180,8 @@ def main(FLAGS, UNPARSED_ARGV):
         print(f"Saved: {save_path}")
 
         train_epoch(epoch, model, task_loss, train_loader, optimizer, scheduler, FLAGS)
-        val_epoch(epoch, model, task_loss, val_loader, FLAGS)
-        test_epoch(epoch, model, task_loss, test_loader, FLAGS)
+        # val_epoch(epoch, model, task_loss, val_loader, FLAGS)
+        # test_epoch(epoch, model, task_loss, test_loader, FLAGS)
 
 
 if __name__ == '__main__':
@@ -210,7 +212,7 @@ if __name__ == '__main__':
             help="Batch size")
     parser.add_argument('--lr', type=float, default=1e-3, 
             help="Learning rate")
-    parser.add_argument('--num_epochs', type=int, default=50, 
+    parser.add_argument('--num_epochs', type=int, default=1,
             help="Number of epochs")
 
     # Data
