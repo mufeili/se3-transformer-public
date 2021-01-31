@@ -80,7 +80,6 @@ class QM9Dataset(Dataset):
             self.targets = (self.targets - self.mean) / self.std
 
         self.graphs = []
-        self.labels = []
 
         for idx in range(len(self)):
             # Load node features
@@ -93,10 +92,6 @@ class QM9Dataset(Dataset):
             num_bonds = self.get('num_bonds', idx)
             edge = self.get('edge', idx)[:num_bonds]
             edge = np.asarray(edge, dtype=DTYPE_INT)
-
-            # Load target
-            y = self.get_target(idx).astype(DTYPE)
-            y = np.array([y])
 
             # Augmentation on the coordinates
             if self.transform:
@@ -120,7 +115,7 @@ class QM9Dataset(Dataset):
             G.edata['d'] = torch.tensor(x[dst] - x[src]) #[num_atoms,3]
             G.edata['w'] = torch.tensor(w) #[num_atoms,4]
 
-            return G, y
+            self.graphs.append(G)
 
     def get_target(self, idx):
         target = self.targets[idx]
@@ -196,7 +191,10 @@ class QM9Dataset(Dataset):
 
 
     def __getitem__(self, idx):
-        return self.graphs[idx], self.labels[idx]
+        # Load target
+        y = self.get_target(idx).astype(DTYPE)
+        y = np.array([y])
+        return self.graphs[idx], y
 
 if __name__ == "__main__":
     def collate(samples):
