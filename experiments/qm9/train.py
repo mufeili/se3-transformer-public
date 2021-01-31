@@ -27,7 +27,7 @@ def train_epoch(epoch, model, loss_fnc, dataloader, optimizer, scheduler, FLAGS)
     num_iters = len(dataloader)
     t0 = time.time()
     for i, (g, y) in enumerate(dataloader):
-        if i == 500:
+        if i == 300:
             break
         g = g.to(FLAGS.device)
         y = y.to(FLAGS.device)
@@ -182,7 +182,8 @@ def main(FLAGS, UNPARSED_ARGV):
         train_epoch(epoch, model, task_loss, train_loader, optimizer, scheduler, FLAGS)
         # val_epoch(epoch, model, task_loss, val_loader, FLAGS)
         # test_epoch(epoch, model, task_loss, test_loader, FLAGS)
-
+        if epoch == 0:
+            break
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

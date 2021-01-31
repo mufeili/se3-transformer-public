@@ -33,7 +33,7 @@ class QM9Dataset(Dataset):
                        'cv': 1.0} 
 
     def __init__(self, file_address: str, task: str, mode: str='train', 
-            transform=None, fully_connected: bool=False): 
+            transform=None, fully_connected: bool=False, normalize: bool=True):
         """Create a dataset object
 
         Args:
@@ -42,6 +42,7 @@ class QM9Dataset(Dataset):
             mode: [train/val/test] mode
             transform: data augmentation functions
             fully_connected: return a fully connected graph
+            normalize: whether to normalize the targets
         """
         self.file_address = file_address
         self.task = task
@@ -52,7 +53,7 @@ class QM9Dataset(Dataset):
         # Encode and extra bond type for fully connected graphs
         self.num_bonds += fully_connected
 
-        self.load_data()
+        self.load_data(normalize)
         self.len = len(self.targets)
         print(f"Loaded {mode}-set, task: {task}, source: {self.file_address}, length: {len(self)}")
 
@@ -61,7 +62,7 @@ class QM9Dataset(Dataset):
         return self.len
 
     
-    def load_data(self):
+    def load_data(self, normalize):
         # Load dict and select train/valid/test split
         data = torch.load(self.file_address)
         data = data[self.mode]
@@ -75,12 +76,54 @@ class QM9Dataset(Dataset):
         # TODO: use the training stats unlike the other papers
         self.mean = np.mean(self.targets)
         self.std = np.std(self.targets)
-
-
-    def get_target(self, idx, normalize=True):
-        target = self.targets[idx]
         if normalize:
-            target = (target - self.mean) / self.std
+            self.targets = (self.targets - self.mean) / self.std
+
+        self.graphs = []
+        self.labels = []
+
+        for idx in range(len(self)):
+            # Load node features
+            num_atoms = self.get('num_atoms', idx)
+            x = self.get('x', idx)[:num_atoms].astype(DTYPE)
+            one_hot = self.get('one_hot', idx)[:num_atoms].astype(DTYPE)
+            atomic_numbers = self.get('atomic_numbers', idx)[:num_atoms].astype(DTYPE)
+
+            # Load edge features
+            num_bonds = self.get('num_bonds', idx)
+            edge = self.get('edge', idx)[:num_bonds]
+            edge = np.asarray(edge, dtype=DTYPE_INT)
+
+            # Load target
+            y = self.get_target(idx).astype(DTYPE)
+            y = np.array([y])
+
+            # Augmentation on the coordinates
+            if self.transform:
+                x = self.transform(x).astype(DTYPE)
+
+            # Create nodes
+            if self.fully_connected:
+                src, dst, w = self.connect_fully(edge, num_atoms)
+            else:
+                src, dst, w = self.connect_partially(edge)
+            w = self.to_one_hot(w, self.num_bonds).astype(DTYPE)
+
+            # Create graph
+            G = dgl.graph((src, dst))
+
+            # Add node features to graph
+            G.ndata['x'] = torch.tensor(x) #[num_atoms,3]
+            G.ndata['f'] = torch.tensor(np.concatenate([one_hot, atomic_numbers], -1)[...,None]) #[num_atoms,6,1]
+
+            # Add edge features to graph
+            G.edata['d'] = torch.tensor(x[dst] - x[src]) #[num_atoms,3]
+            G.edata['w'] = torch.tensor(w) #[num_atoms,4]
+
+            return G, y
+
+    def get_target(self, idx):
+        target = self.targets[idx]
         return target
 
 
@@ -153,45 +196,7 @@ class QM9Dataset(Dataset):
 
 
     def __getitem__(self, idx):
-        # Load node features
-        num_atoms = self.get('num_atoms', idx)
-        x = self.get('x', idx)[:num_atoms].astype(DTYPE)
-        one_hot = self.get('one_hot', idx)[:num_atoms].astype(DTYPE)
-        atomic_numbers = self.get('atomic_numbers', idx)[:num_atoms].astype(DTYPE)
-
-        # Load edge features
-        num_bonds = self.get('num_bonds', idx)
-        edge = self.get('edge', idx)[:num_bonds]
-        edge = np.asarray(edge, dtype=DTYPE_INT)
-
-        # Load target
-        y = self.get_target(idx, normalize=True).astype(DTYPE)
-        y = np.array([y])
-
-        # Augmentation on the coordinates
-        if self.transform:
-            x = self.transform(x).astype(DTYPE)
-
-        # Create nodes
-        if self.fully_connected:
-            src, dst, w = self.connect_fully(edge, num_atoms)
-        else:
-            src, dst, w = self.connect_partially(edge)
-        w = self.to_one_hot(w, self.num_bonds).astype(DTYPE)
-
-        # Create graph
-        G = dgl.DGLGraph((src, dst))
-
-        # Add node features to graph
-        G.ndata['x'] = torch.tensor(x) #[num_atoms,3]
-        G.ndata['f'] = torch.tensor(np.concatenate([one_hot, atomic_numbers], -1)[...,None]) #[num_atoms,6,1]
-
-        # Add edge features to graph
-        G.edata['d'] = torch.tensor(x[dst] - x[src]) #[num_atoms,3]
-        G.edata['w'] = torch.tensor(w) #[num_atoms,4]
-
-        return G, y
-
+        return self.graphs[idx], self.labels[idx]
 
 if __name__ == "__main__":
     def collate(samples):
