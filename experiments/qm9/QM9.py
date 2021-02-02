@@ -113,7 +113,9 @@ class QM9Dataset(Dataset):
 
             # Add edge features to graph
             G.edata['d'] = torch.tensor(x[dst] - x[src]) #[num_atoms,3]
-            G.edata['w'] = torch.tensor(w) #[num_atoms,4]
+            # Relative distances (scalar)
+            r = torch.sqrt(torch.sum(G.edata['d'] ** 2, -1, keepdim=True))
+            G.edata['feat'] = torch.cat([torch.tensor(w), r], -1)
 
             self.graphs.append(G)
 

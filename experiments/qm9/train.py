@@ -18,18 +18,17 @@ from torch.utils.data import DataLoader
 from QM9 import QM9Dataset
 
 from experiments.qm9 import models #as models
-from equivariant_attention.modules import get_basis_and_r
+from equivariant_attention.modules import get_basis_preprocess
 
 def to_np(x):
     return x.cpu().detach().numpy()
 
-def to_device(g, y, basis, r, device):
+def to_device(g, y, basis, device):
     g = g.to(device)
     y = y.to(device)
     for k, v in basis.items():
         basis[k] = v.to(device)
-    r = r.to(device)
-    return g, y, basis, r
+    return g, y, basis
 
 @profile
 def train_epoch(epoch, model, loss_fnc, dataloader, optimizer, scheduler, FLAGS):
@@ -37,15 +36,15 @@ def train_epoch(epoch, model, loss_fnc, dataloader, optimizer, scheduler, FLAGS)
 
     num_iters = len(dataloader)
     t0 = time.time()
-    for i, (g, y, basis, r) in enumerate(dataloader):
+    for i, (g, y, basis) in enumerate(dataloader):
         if i == 50:
             break
-        g, y, basis, r = to_device(g, y, basis, r, FLAGS.device)
+        g, y, basis = to_device(g, y, basis, FLAGS.device)
 
         optimizer.zero_grad()
 
         # run model forward and compute loss
-        pred = model(g, basis, r)
+        pred = model(g, basis)
         l1_loss, __, rescale_loss = loss_fnc(pred, y)
 
         # backprop
@@ -68,11 +67,11 @@ def val_epoch(epoch, model, loss_fnc, dataloader, FLAGS):
     model.eval()
 
     rloss = 0
-    for i, (g, y, basis, r) in enumerate(dataloader):
-        g, y, basis, r = to_device(g, y, basis, r, FLAGS.device)
+    for i, (g, y, basis) in enumerate(dataloader):
+        g, y, basis = to_device(g, y, basis, FLAGS.device)
 
         # run model forward and compute loss
-        pred = model(g, basis, r).detach()
+        pred = model(g, basis).detach()
         __, __, rl = loss_fnc(pred, y, use_mean=False)
         rloss += rl
     rloss /= FLAGS.val_size
@@ -84,11 +83,11 @@ def test_epoch(epoch, model, loss_fnc, dataloader, FLAGS):
     model.eval()
 
     rloss = 0
-    for i, (g, y, basis, r) in enumerate(dataloader):
-        g, y, basis, r = to_device(g, y, basis, r, FLAGS.device)
+    for i, (g, y, basis) in enumerate(dataloader):
+        g, y, basis = to_device(g, y, basis, FLAGS.device)
 
         # run model forward and compute loss
-        pred = model(g, basis, r).detach()
+        pred = model(g, basis).detach()
         __, __, rl = loss_fnc(pred, y, use_mean=False)
         rloss += rl
     rloss /= FLAGS.test_size
@@ -110,8 +109,8 @@ def collate(samples, num_degrees):
     graphs, y = map(list, zip(*samples))
     batched_graph = dgl.batch(graphs)
     # Compute equivariant weight basis from relative positions
-    basis, r = get_basis_and_r(batched_graph, num_degrees)
-    return batched_graph, torch.tensor(y), basis, r
+    basis = get_basis_preprocess(batched_graph, num_degrees)
+    return batched_graph, torch.tensor(y), basis
 
 @profile
 def main(FLAGS, UNPARSED_ARGV):

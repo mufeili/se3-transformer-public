@@ -55,7 +55,7 @@ def get_basis(Y, max_degree):
         return basis
 
 
-def get_basis_and_r(G, max_degree):
+def get_basis_preprocess(G, max_degree):
     """Return equivariant weight basis (basis) and internodal distances (r).
 
     Call this function *once* at the start of each forward pass of the model.
@@ -77,9 +77,7 @@ def get_basis_and_r(G, max_degree):
     Y = utils_steerable.precompute_sh(r_ij, 2*max_degree)
     # Equivariant basis (dict['d_in><d_out>'])
     basis = get_basis(Y, max_degree)
-    # Relative distances (scalar)
-    r = torch.sqrt(torch.sum(G.edata['d']**2, -1, keepdim=True))
-    return basis, r
+    return basis
 
 
 
@@ -160,13 +158,12 @@ class GConvSE3(nn.Module):
         return fnc
 
     @profile
-    def forward(self, h, G=None, r=None, basis=None, **kwargs):
+    def forward(self, h, G=None, basis=None, **kwargs):
         """Forward pass of the linear layer
 
         Args:
             G: minibatch of (homo)graphs
             h: dict of features
-            r: inter-atomic distances
             basis: pre-computed Q * Y
         Returns: 
             tensor with new features [B, n_points, n_features_out]
@@ -177,16 +174,10 @@ class GConvSE3(nn.Module):
                 G.ndata[k] = v
 
             # Add edge features
-            if 'w' in G.edata.keys():
-                w = G.edata['w']
-                feat = torch.cat([w, r], -1)
-            else:
-                feat = torch.cat([r, ], -1)
-
             for (mi, di) in self.f_in.structure:
                 for (mo, do) in self.f_out.structure:
                     etype = f'({di},{do})'
-                    G.edata[etype] = self.kernel_unary[etype](feat, basis)
+                    G.edata[etype] = self.kernel_unary[etype](G.edata['feat'], basis)
 
             # Perform message-passing for each output feature type
             for d in self.f_out.degrees:
@@ -439,7 +430,7 @@ class GConvSE3Partial(nn.Module):
         return fnc
 
     @profile
-    def forward(self, h, G=None, r=None, basis=None, **kwargs):
+    def forward(self, h, G=None, basis=None, **kwargs):
         """Forward pass of the linear layer
 
         Args:
@@ -456,15 +447,10 @@ class GConvSE3Partial(nn.Module):
                 G.ndata[k] = v
 
             # Add edge features
-            if 'w' in G.edata.keys():
-                w = G.edata['w'] # shape: [#edges_in_batch, #bond_types]
-                feat = torch.cat([w, r], -1)
-            else:
-                feat = torch.cat([r, ], -1)
             for (mi, di) in self.f_in.structure:
                 for (mo, do) in self.f_out.structure:
                     etype = f'({di},{do})'
-                    G.edata[etype] = self.kernel_unary[etype](feat, basis)
+                    G.edata[etype] = self.kernel_unary[etype](G.edata['feat'], basis)
 
             # Perform message-passing for each output feature type
             for d in self.f_out.degrees:

@@ -1,6 +1,6 @@
 from torch import nn
 
-from equivariant_attention.modules import GConvSE3, GNormSE3, get_basis_and_r, GSE3Res, GMaxPooling, GAvgPooling
+from equivariant_attention.modules import GConvSE3, GNormSE3, GSE3Res, GMaxPooling, GAvgPooling
 from equivariant_attention.fibers import Fiber
 
 
@@ -92,7 +92,7 @@ class SE3Transformer(nn.Module):
         Gblock = []
         fin = fibers['in']
         for i in range(self.num_layers):
-            Gblock.append(GSE3Res(fin, fibers['mid'], edge_dim=self.edge_dim, 
+            Gblock.append(GSE3Res(fin, fibers['mid'], edge_dim=self.edge_dim,
                                   div=self.div, n_heads=self.n_heads))
             Gblock.append(GNormSE3(fibers['mid']))
             fin = fibers['mid']
@@ -106,18 +106,18 @@ class SE3Transformer(nn.Module):
 
         # FC layers
         FCblock = []
-        FCblock.append(nn.Linear(self.fibers['out'].n_features, self.fibers['out'].n_features))
+        FCblock.appendx(nn.Linear(self.fibers['out'].n_features, self.fibers['out'].n_features))
         FCblock.append(nn.ReLU(inplace=True))
         FCblock.append(nn.Linear(self.fibers['out'].n_features, out_dim))
 
         return nn.ModuleList(Gblock), nn.ModuleList(FCblock)
 
     @profile
-    def forward(self, G, basis, r):
+    def forward(self, G, basis):
         # encoder (equivariant layers)
         h = {'0': G.ndata['f']}
         for layer in self.Gblock:
-            h = layer(h, G=G, r=r, basis=basis)
+            h = layer(h, G=G, basis=basis)
 
         for layer in self.FCblock:
             h = layer(h)
