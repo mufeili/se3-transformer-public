@@ -431,7 +431,8 @@ class GConvSE3Partial(nn.Module):
             for (mi, di) in self.f_in.structure:
                 for (mo, do) in self.f_out.structure:
                     etype = f'({di},{do})'
-                    G.edata[etype] = self.kernel_unary[etype](G.edata['feat'], basis)
+                    if etype not in G.edata:
+                        G.edata[etype] = self.kernel_unary[etype](G.edata['feat'], basis)
 
             # Perform message-passing for each output feature type
             for m_in, d_in in self.f_in.structure:
