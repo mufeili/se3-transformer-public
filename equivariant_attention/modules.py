@@ -181,7 +181,8 @@ class GConvSE3(nn.Module):
 
             # Perform message-passing for each output feature type
             for d in self.f_out.degrees:
-                G.update_all(self.udf_u_mul_e(d), fn.mean('msg', f'out{d}'))
+                G.apply_edges(self.udf_u_mul_e(d))
+                G.update_all(fn.copy_e('msg', 'msg'), fn.mean('msg', f'out{d}'))
 
             return {f'{d}': G.ndata[f'out{d}'] for d in self.f_out.degrees}
 
