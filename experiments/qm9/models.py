@@ -106,7 +106,7 @@ class SE3Transformer(nn.Module):
 
         # FC layers
         FCblock = []
-        FCblock.appendx(nn.Linear(self.fibers['out'].n_features, self.fibers['out'].n_features))
+        FCblock.append(nn.Linear(self.fibers['out'].n_features, self.fibers['out'].n_features))
         FCblock.append(nn.ReLU(inplace=True))
         FCblock.append(nn.Linear(self.fibers['out'].n_features, out_dim))
 
