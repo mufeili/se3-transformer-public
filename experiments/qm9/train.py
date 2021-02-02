@@ -37,8 +37,6 @@ def train_epoch(epoch, model, loss_fnc, dataloader, optimizer, scheduler, FLAGS)
     num_iters = len(dataloader)
     t0 = time.time()
     for i, (g, y, basis) in enumerate(dataloader):
-        if i == 100:
-            break
         g, y, basis = to_device(g, y, basis, FLAGS.device)
 
         optimizer.zero_grad()
