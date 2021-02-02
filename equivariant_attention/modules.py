@@ -435,15 +435,15 @@ class GConvSE3Partial(nn.Module):
 
             # Perform message-passing for each output feature type
             for m_in, d_in in self.f_in.structure:
-                G.apply_edges(
-                    lambda edges: {'src_{}_{}'.format(m_in, d_in):
-                                    edges.src[f'{d_in}'].view(-1, m_in*(2*d_in+1), 1)})
+                if 'src_{}'.format(d_in) not in G.edata:
+                    G.edata.apply_edges(fn.copy_u(f'{d_in}', 'src_{}'.format(d_in)))
 
             for d_out in self.f_out.degrees:
                 msg = 0
                 for m_in, d_in in self.f_in.structure:
-                    msg = msg + torch.matmul(G.edata[f'({d_in},{d_out})'],
-                                             G.edata['src_{}_{}'.format(m_in, d_in)])
+                    msg = msg + torch.matmul(
+                        G.edata[f'({d_in},{d_out})'],
+                        G.edata['src_{}'.format(d_in)].view(-1, m_in * (2 * d_in + 1), 1))
                 G.edata[f'out{d_out}'] = msg.view(msg.shape[0], -1, 2 * d_out + 1)
 
             return {f'{d}': G.edata[f'out{d}'] for d in self.f_out.degrees}
