@@ -431,12 +431,12 @@ class GConvSE3Partial(nn.Module):
             for (mi, di) in self.f_in.structure:
                 for (mo, do) in self.f_out.structure:
                     etype = f'({di},{do})'
-                    if etype not in G.edata:
+                    if etype not in G.edata.keys():
                         G.edata[etype] = self.kernel_unary[etype](G.edata['feat'], basis)
 
             # Perform message-passing for each output feature type
             for m_in, d_in in self.f_in.structure:
-                if 'src_{}'.format(d_in) not in G.edata:
+                if 'src_{}'.format(d_in) not in G.edata.keys():
                     G.apply_edges(fn.copy_u(f'{d_in}', 'src_{}'.format(d_in)))
 
             for d_out in self.f_out.degrees:
