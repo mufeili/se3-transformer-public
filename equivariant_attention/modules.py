@@ -478,27 +478,6 @@ class GMABSE3(nn.Module):
     def __repr__(self):
         return f'GMABSE3(n_heads={self.n_heads}, structure={self.f_value})'
 
-    def udf_u_mul_e(self, d_out):
-        """Compute the weighted sum for a single output feature type.
-
-        This function is set up as a User Defined Function in DGL.
-
-        Args:
-            d_out: output feature type
-        Returns:
-            edge -> node function handle
-        """
-        def fnc(edges):
-            # Neighbor -> center messages
-            attn = edges.data['a']
-            value = edges.data[f'v{d_out}']
-
-            # Apply attention weights
-            msg = attn.unsqueeze(-1).unsqueeze(-1) * value
-
-            return {'m': msg}
-        return fnc
-
     @profile
     def forward(self, v, k: Dict=None, q: Dict=None, G=None, **kwargs):
         """Forward pass of the linear layer
@@ -533,9 +512,11 @@ class GMABSE3(nn.Module):
             e = e / np.sqrt(self.f_key.n_features)
             G.edata['a'] = edge_softmax(G, e)
 
-            # Perform attention-weighted message-passing 
+            # Perform attention-weighted message-passing
+            attn = G.edata['a'].unsqueeze(-1).unsqueeze(-1)
             for d in self.f_value.degrees:
-                G.update_all(self.udf_u_mul_e(d), fn.sum('m', f'out{d}'))
+                G.edata['{}_m'.format(d)] = attn * G.edata[f'v{d}']
+                G.update_all(G.copy_e('{}_m'.format(d), 'm'), fn.sum('m', f'out{d}'))
 
             output = {}
             for m, d in self.f_value.structure:
