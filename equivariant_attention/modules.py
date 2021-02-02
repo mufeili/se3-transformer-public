@@ -55,7 +55,7 @@ def get_basis(Y, max_degree):
         return basis
 
 
-def get_basis_preprocess(G, max_degree):
+def get_basis_and_r(G, max_degree):
     """Return equivariant weight basis (basis) and internodal distances (r).
 
     Call this function *once* at the start of each forward pass of the model.
@@ -77,7 +77,9 @@ def get_basis_preprocess(G, max_degree):
     Y = utils_steerable.precompute_sh(r_ij, 2*max_degree)
     # Equivariant basis (dict['d_in><d_out>'])
     basis = get_basis(Y, max_degree)
-    return basis
+    # Relative distances (scalar)
+    r = torch.sqrt(torch.sum(G.edata['d'] ** 2, -1, keepdim=True))
+    return basis, r
 
 
 
@@ -408,28 +410,6 @@ class GConvSE3Partial(nn.Module):
     def __repr__(self):
         return f'GConvSE3Partial(structure={self.f_out})'
 
-    def udf_u_mul_e(self, d_out):
-        """Compute the partial convolution for a single output feature type.
-
-        This function is set up as a User Defined Function in DGL.
-
-        Args:
-            d_out: output feature type
-        Returns:
-            node -> edge function handle
-        """
-        def fnc(edges):
-            # Neighbor -> center messages
-            msg = 0
-            for m_in, d_in in self.f_in.structure:
-                src = edges.src[f'{d_in}'].view(-1, m_in*(2*d_in+1), 1)
-                edge = edges.data[f'({d_in},{d_out})']
-                msg = msg + torch.matmul(edge, src)
-            msg = msg.view(msg.shape[0], -1, 2*d_out+1)
-
-            return {f'out{d_out}': msg.view(msg.shape[0], -1, 2*d_out+1)}
-        return fnc
-
     @profile
     def forward(self, h, G=None, basis=None, **kwargs):
         """Forward pass of the linear layer
@@ -454,8 +434,17 @@ class GConvSE3Partial(nn.Module):
                     G.edata[etype] = self.kernel_unary[etype](G.edata['feat'], basis)
 
             # Perform message-passing for each output feature type
-            for d in self.f_out.degrees:
-                G.apply_edges(self.udf_u_mul_e(d))
+            for m_in, d_in in self.f_in.structure:
+                G.apply_edges(
+                    lambda edges: {'src_{}_{}'.format(m_in, d_in):
+                                    edges.src[f'{d_in}'].view(-1, m_in*(2*d_in+1), 1)})
+
+            for d_out in self.f_out.degrees:
+                msg = 0
+                for m_in, d_in in self.f_in.structure:
+                    msg = msg + torch.matmul(G.edata[f'({d_in},{d_out})'],
+                                             G.edata['src_{}_{}'.format(m_in, d_in)])
+                G.edata[f'out{d_out}'] = msg.view(msg.shape[0], -1, 2 * d_out + 1)
 
             return {f'{d}': G.edata[f'out{d}'] for d in self.f_out.degrees}
 

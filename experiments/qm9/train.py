@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader
 from QM9 import QM9Dataset
 
 from experiments.qm9 import models #as models
-from equivariant_attention.modules import get_basis_preprocess
+from equivariant_attention.modules import get_basis_and_r
 
 def to_np(x):
     return x.cpu().detach().numpy()
@@ -109,7 +109,9 @@ def collate(samples, num_degrees):
     graphs, y = map(list, zip(*samples))
     batched_graph = dgl.batch(graphs)
     # Compute equivariant weight basis from relative positions
-    basis = get_basis_preprocess(batched_graph, num_degrees)
+    basis, r = get_basis_and_r(batched_graph, num_degrees)
+    batched_graph.edata['feat'] = torch.cat([batched_graph.edata['w'], r], -1)
+
     return batched_graph, torch.tensor(y), basis
 
 @profile
