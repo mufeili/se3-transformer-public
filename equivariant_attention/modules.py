@@ -410,6 +410,25 @@ class GConvSE3Partial(nn.Module):
     def __repr__(self):
         return f'GConvSE3Partial(structure={self.f_out})'
 
+    def udf_u_mul_e(self, d_out):
+        """Compute the partial convolution for a single output feature type.
+        This function is set up as a User Defined Function in DGL.
+        Args:
+            d_out: output feature type
+        Returns:
+            node -> edge function handle
+        """
+        def fnc(edges):
+            # Neighbor -> center messages
+            msg = 0
+            for m_in, d_in in self.f_in.structure:
+                msg = msg + torch.matmul(
+                    edges.data[f'({d_in},{d_out})'],
+                    edges.data['src_{}'.format(d_in)].view(-1, m_in * (2 * d_in + 1), 1))
+
+            return {f'out{d_out}': msg.view(msg.shape[0], -1, 2*d_out+1)}
+        return fnc
+
     @profile
     def forward(self, h, G=None, basis=None, **kwargs):
         """Forward pass of the linear layer
@@ -440,12 +459,7 @@ class GConvSE3Partial(nn.Module):
                     G.apply_edges(fn.copy_u(f'{d_in}', 'src_{}'.format(d_in)))
 
             for d_out in self.f_out.degrees:
-                msg = 0
-                for m_in, d_in in self.f_in.structure:
-                    msg = msg + torch.matmul(
-                        G.edata[f'({d_in},{d_out})'],
-                        G.edata['src_{}'.format(d_in)].view(-1, m_in * (2 * d_in + 1), 1))
-                G.edata[f'out{d_out}'] = msg.view(msg.shape[0], -1, 2 * d_out + 1)
+                G.apply_edges(self.udf_u_mul_e(d_out))
 
             return {f'{d}': G.edata[f'out{d}'] for d in self.f_out.degrees}
 
