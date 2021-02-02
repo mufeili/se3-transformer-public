@@ -33,10 +33,10 @@ class TFN(nn.Module):
         block0 = []
         fin = fibers['in']
         for i in range(self.num_layers-1):
-            block0.append(GConvSE3(fin, fibers['mid'], self_interaction=True, edge_dim=self.edge_dim))
+            block0.append(GConvSE3(fin, fibers['mid'], edge_dim=self.edge_dim))
             block0.append(GNormSE3(fibers['mid'], num_layers=self.num_nlayers))
             fin = fibers['mid']
-        block0.append(GConvSE3(fibers['mid'], fibers['out'], self_interaction=True, edge_dim=self.edge_dim))
+        block0.append(GConvSE3(fibers['mid'], fibers['out'], edge_dim=self.edge_dim))
 
         block1 = [GMaxPooling()]
 
@@ -96,7 +96,7 @@ class SE3Transformer(nn.Module):
                                   div=self.div, n_heads=self.n_heads))
             Gblock.append(GNormSE3(fibers['mid']))
             fin = fibers['mid']
-        Gblock.append(GConvSE3(fibers['mid'], fibers['out'], self_interaction=True, edge_dim=self.edge_dim))
+        Gblock.append(GConvSE3(fibers['mid'], fibers['out'], edge_dim=self.edge_dim))
 
         # Pooling
         if self.pooling == 'avg':

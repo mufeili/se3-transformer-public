@@ -93,7 +93,7 @@ class GConvSE3(nn.Module):
     At each node, the activations are split into different "feature types",
     indexed by the SE(3) representation type: non-negative integers 0, 1, 2, ..
     """
-    def __init__(self, f_in, f_out, self_interaction: bool=False, edge_dim: int=0):
+    def __init__(self, f_in, f_out, self_interaction: bool=True, edge_dim: int=0):
         """SE(3)-equivariant Graph Conv Layer
 
         Args:
@@ -516,7 +516,7 @@ class GMABSE3(nn.Module):
             attn = G.edata['a'].unsqueeze(-1).unsqueeze(-1)
             for d in self.f_value.degrees:
                 G.edata['{}_m'.format(d)] = attn * G.edata[f'v{d}']
-                G.update_all(G.copy_e('{}_m'.format(d), 'm'), fn.sum('m', f'out{d}'))
+                G.update_all(fn.copy_e('{}_m'.format(d), 'm'), fn.sum('m', f'out{d}'))
 
             output = {}
             for m, d in self.f_value.structure:
