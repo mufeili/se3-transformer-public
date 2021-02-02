@@ -30,7 +30,6 @@ def to_device(g, y, basis, device):
         basis[k] = v.to(device)
     return g, y, basis
 
-@profile
 def train_epoch(epoch, model, loss_fnc, dataloader, optimizer, scheduler, FLAGS):
     model.train()
 
@@ -112,7 +111,6 @@ def collate(samples, num_degrees):
 
     return batched_graph, torch.tensor(y), basis
 
-@profile
 def main(FLAGS, UNPARSED_ARGV):
 
     # Prepare data
