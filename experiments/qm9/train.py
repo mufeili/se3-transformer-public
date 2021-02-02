@@ -28,7 +28,7 @@ def train_epoch(epoch, model, loss_fnc, dataloader, optimizer, scheduler, FLAGS)
     num_iters = len(dataloader)
     t0 = time.time()
     for i, (g, y) in enumerate(dataloader):
-        if i == 300:
+        if i == 50:
             break
         g = g.to(FLAGS.device)
         y = y.to(FLAGS.device)
@@ -104,6 +104,7 @@ def collate(samples):
     batched_graph = dgl.batch(graphs)
     return batched_graph, torch.tensor(y)
 
+@profile
 def main(FLAGS, UNPARSED_ARGV):
 
     # Prepare data
