@@ -12,14 +12,24 @@ import time
 import torch
 import wandb
 
+from functools import partial
 from torch import optim
 from torch.utils.data import DataLoader
 from QM9 import QM9Dataset
 
 from experiments.qm9 import models #as models
+from equivariant_attention.modules import get_basis_and_r
 
 def to_np(x):
     return x.cpu().detach().numpy()
+
+def to_device(g, y, basis, r, device):
+    g = g.to(device)
+    y = y.to(device)
+    for k, v in basis.items():
+        basis[k] = v.to(device)
+    r = r.to(device)
+    return g, y, basis, r
 
 @profile
 def train_epoch(epoch, model, loss_fnc, dataloader, optimizer, scheduler, FLAGS):
@@ -27,16 +37,15 @@ def train_epoch(epoch, model, loss_fnc, dataloader, optimizer, scheduler, FLAGS)
 
     num_iters = len(dataloader)
     t0 = time.time()
-    for i, (g, y) in enumerate(dataloader):
+    for i, (g, y, basis, r) in enumerate(dataloader):
         if i == 50:
             break
-        g = g.to(FLAGS.device)
-        y = y.to(FLAGS.device)
+        g, y, basis, r = to_device(g, y, basis, r, FLAGS.device)
 
         optimizer.zero_grad()
 
         # run model forward and compute loss
-        pred = model(g)
+        pred = model(g, basis, r)
         l1_loss, __, rescale_loss = loss_fnc(pred, y)
 
         # backprop
@@ -59,12 +68,11 @@ def val_epoch(epoch, model, loss_fnc, dataloader, FLAGS):
     model.eval()
 
     rloss = 0
-    for i, (g, y) in enumerate(dataloader):
-        g = g.to(FLAGS.device)
-        y = y.to(FLAGS.device)
+    for i, (g, y, basis, r) in enumerate(dataloader):
+        g, y, basis, r = to_device(g, y, basis, r, FLAGS.device)
 
         # run model forward and compute loss
-        pred = model(g).detach()
+        pred = model(g, basis, r).detach()
         __, __, rl = loss_fnc(pred, y, use_mean=False)
         rloss += rl
     rloss /= FLAGS.val_size
@@ -76,12 +84,11 @@ def test_epoch(epoch, model, loss_fnc, dataloader, FLAGS):
     model.eval()
 
     rloss = 0
-    for i, (g, y) in enumerate(dataloader):
-        g = g.to(FLAGS.device)
-        y = y.to(FLAGS.device)
+    for i, (g, y, basis, r) in enumerate(dataloader):
+        g, y, basis, r = to_device(g, y, basis, r, FLAGS.device)
 
         # run model forward and compute loss
-        pred = model(g).detach()
+        pred = model(g, basis, r).detach()
         __, __, rl = loss_fnc(pred, y, use_mean=False)
         rloss += rl
     rloss /= FLAGS.test_size
@@ -99,10 +106,12 @@ class RandomRotation(object):
         Q, __ = np.linalg.qr(M)
         return x @ Q
 
-def collate(samples):
+def collate(samples, num_degrees):
     graphs, y = map(list, zip(*samples))
     batched_graph = dgl.batch(graphs)
-    return batched_graph, torch.tensor(y)
+    # Compute equivariant weight basis from relative positions
+    basis, r = get_basis_and_r(batched_graph, num_degrees)
+    return batched_graph, torch.tensor(y), basis, r
 
 @profile
 def main(FLAGS, UNPARSED_ARGV):
@@ -114,8 +123,8 @@ def main(FLAGS, UNPARSED_ARGV):
                                transform=RandomRotation())
     train_loader = DataLoader(train_dataset, 
                               batch_size=FLAGS.batch_size, 
-			      shuffle=True, 
-                              collate_fn=collate, 
+			                  shuffle=True,
+                              collate_fn=partial(collate, num_degrees=FLAGS.num_degrees-1),
                               num_workers=FLAGS.num_workers)
 
     val_dataset = QM9Dataset(FLAGS.data_address, 
@@ -123,17 +132,17 @@ def main(FLAGS, UNPARSED_ARGV):
                              mode='valid') 
     val_loader = DataLoader(val_dataset, 
                             batch_size=FLAGS.batch_size, 
-			    shuffle=False, 
-                            collate_fn=collate, 
+			                shuffle=False,
+                            collate_fn=partial(collate, num_degrees=FLAGS.num_degrees-1),
                             num_workers=FLAGS.num_workers)
 
     test_dataset = QM9Dataset(FLAGS.data_address, 
-                             FLAGS.task, 
-                             mode='test') 
+                              FLAGS.task,
+                              mode='test')
     test_loader = DataLoader(test_dataset, 
                              batch_size=FLAGS.batch_size, 
-			     shuffle=False, 
-                             collate_fn=collate, 
+			                 shuffle=False,
+                             collate_fn=partial(collate, num_degrees=FLAGS.num_degrees-1),
                              num_workers=FLAGS.num_workers)
 
     FLAGS.train_size = len(train_dataset)

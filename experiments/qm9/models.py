@@ -1,12 +1,4 @@
-import sys
-
-import numpy as np
-import torch
-
-from dgl.nn.pytorch import GraphConv, NNConv
 from torch import nn
-from torch.nn import functional as F
-from typing import Dict, Tuple, List
 
 from equivariant_attention.modules import GConvSE3, GNormSE3, get_basis_and_r, GSE3Res, GMaxPooling, GAvgPooling
 from equivariant_attention.fibers import Fiber
@@ -16,7 +8,7 @@ class TFN(nn.Module):
     """SE(3) equivariant GCN"""
     def __init__(self, num_layers: int, atom_feature_size: int, 
                  num_channels: int, num_nlayers: int=1, num_degrees: int=4, 
-                 edge_dim: int=4, **kwargs):
+                 edge_dim: int=4):
         super().__init__()
         # Build the network
         self.num_layers = num_layers
@@ -55,10 +47,7 @@ class TFN(nn.Module):
 
         return nn.ModuleList(block0), nn.ModuleList(block1), nn.ModuleList(block2)
 
-    def forward(self, G):
-        # Compute equivariant weight basis from relative positions
-        basis, r = get_basis_and_r(G, self.num_degrees-1)
-
+    def forward(self, G, basis, r):
         # encoder (equivariant layers)
         h = {'0': G.ndata['f']}
         for layer in self.block0:
@@ -77,7 +66,7 @@ class SE3Transformer(nn.Module):
     """SE(3) equivariant GCN with attention"""
     def __init__(self, num_layers: int, atom_feature_size: int, 
                  num_channels: int, num_nlayers: int=1, num_degrees: int=4, 
-                 edge_dim: int=4, div: float=4, pooling: str='avg', n_heads: int=1, **kwargs):
+                 edge_dim: int=4, div: float=4, pooling: str='avg', n_heads: int=1):
         super().__init__()
         # Build the network
         self.num_layers = num_layers
@@ -124,10 +113,7 @@ class SE3Transformer(nn.Module):
         return nn.ModuleList(Gblock), nn.ModuleList(FCblock)
 
     @profile
-    def forward(self, G):
-        # Compute equivariant weight basis from relative positions
-        basis, r = get_basis_and_r(G, self.num_degrees-1)
-
+    def forward(self, G, basis, r):
         # encoder (equivariant layers)
         h = {'0': G.ndata['f']}
         for layer in self.Gblock:
