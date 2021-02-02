@@ -108,7 +108,6 @@ class QM9Dataset(Dataset):
             G = dgl.graph((src, dst))
 
             # Add node features to graph
-            G.ndata['x'] = torch.tensor(x) #[num_atoms,3]
             G.ndata['f'] = torch.tensor(np.concatenate([one_hot, atomic_numbers], -1)[...,None]) #[num_atoms,6,1]
 
             # Add edge features to graph
